@@ -76,15 +76,26 @@ namespace MapGenerator.ProceduralWorld
         private float[,] height;
         private bool[,] rivers;
         private WorldBiome[,] biomes;
+        private bool _needsRegenerate;
 
         public Texture2D GeneratedTexture => generatedTexture;
 
         private void OnEnable()
         {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.update += HandleEditorUpdate;
+#endif
             if (autoRegenerate)
             {
                 Generate();
             }
+        }
+
+        private void OnDisable()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.update -= HandleEditorUpdate;
+#endif
         }
 
         private void OnValidate()
@@ -92,9 +103,22 @@ namespace MapGenerator.ProceduralWorld
             mapSize = Mathf.Max(16, mapSize);
             if (autoRegenerate)
             {
-                Generate();
+                _needsRegenerate = true;
             }
         }
+
+#if UNITY_EDITOR
+        private void HandleEditorUpdate()
+        {
+            if (!_needsRegenerate)
+            {
+                return;
+            }
+
+            _needsRegenerate = false;
+            Generate();
+        }
+#endif
 
         [ContextMenu("Generate World Map")]
         public void Generate()
