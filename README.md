@@ -12,6 +12,8 @@ Unity scripts for edit-mode procedural world-map generation aimed at survival ga
 ## Usage
 
 1. Copy the `Assets/Scripts/ProceduralWorld` folder into a Unity project.
-2. Add `ProceduralWorldMapGenerator` to a plane or quad with a material to preview generated map textures in edit mode.
-3. Add `CubeSphereWorld` to an empty GameObject with a mesh renderer to generate a spherical world mesh.
-4. Change serialized values in the Inspector; generation refreshes automatically when `Auto Regenerate` is enabled.
+2. In Unity, create a shared procedural-world settings asset from **Assets > Create > Map Generator > Procedural World Settings**.
+3. Add `ProceduralWorldMapGenerator` to a plane or quad with a material to preview generated map textures in edit mode.
+4. Assign the settings asset to the generator's `Settings` field. If no asset is assigned, the generator uses its fallback serialized values.
+5. Add `CubeSphereWorld` to an empty GameObject with a mesh renderer to generate a spherical world mesh.
+6. Change values in the settings asset or fallback Inspector fields; generation refreshes automatically when `Auto Regenerate` is enabled.
