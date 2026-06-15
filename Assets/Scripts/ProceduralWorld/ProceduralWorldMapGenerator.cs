@@ -36,7 +36,10 @@ namespace MapGenerator.ProceduralWorld
     public sealed class ProceduralWorldMapGenerator : MonoBehaviour
     {
         [Header("Preview")]
+        [SerializeField] private WorldSettings settings;
         [SerializeField] private WorldMapPreview preview = WorldMapPreview.Biomes;
+
+        [Header("Fallback Settings")]
         [SerializeField, Min(16)] private int mapSize = 256;
         [SerializeField] private bool autoRegenerate = true;
         [SerializeField] private int seed = 1337;
@@ -80,6 +83,33 @@ namespace MapGenerator.ProceduralWorld
         private bool _needsRegenerate;
 
         public Texture2D GeneratedTexture => generatedTexture;
+        private int MapSize => settings != null ? settings.MapSize : Mathf.Max(16, mapSize);
+        private int Seed => settings != null ? settings.Seed : seed;
+        private float VoronoiScale => settings != null ? settings.VoronoiScale : voronoiScale;
+        private float ContinentSimplexScale => settings != null ? settings.ContinentSimplexScale : continentSimplexScale;
+        private float CoastThreshold => settings != null ? settings.CoastThreshold : coastThreshold;
+        private float CoastBlend => settings != null ? settings.CoastBlend : coastBlend;
+        private float MountainScale => settings != null ? settings.MountainScale : mountainScale;
+        private int MountainOctaves => settings != null ? settings.MountainOctaves : mountainOctaves;
+        private float HillScale => settings != null ? settings.HillScale : hillScale;
+        private int HillOctaves => settings != null ? settings.HillOctaves : hillOctaves;
+        private float TemperatureNoiseScale => settings != null ? settings.TemperatureNoiseScale : temperatureNoiseScale;
+        private float TemperatureNoiseStrength => settings != null ? settings.TemperatureNoiseStrength : temperatureNoiseStrength;
+        private float MoistureScale => settings != null ? settings.MoistureScale : moistureScale;
+        private float CoastalMoistureStrength => settings != null ? settings.CoastalMoistureStrength : coastalMoistureStrength;
+        private int RiverCount => settings != null ? settings.RiverCount : riverCount;
+        private int MaxRiverLength => settings != null ? settings.MaxRiverLength : maxRiverLength;
+        private float RiverSourceMinHeight => settings != null ? settings.RiverSourceMinHeight : riverSourceMinHeight;
+        private float OceanContinentThreshold => settings != null ? settings.OceanContinentThreshold : 0.25f;
+        private float BeachHeightThreshold => settings != null ? settings.BeachHeightThreshold : 0.42f;
+        private float MountainThreshold => settings != null ? settings.MountainThreshold : 0.74f;
+        private float SnowTemperatureThreshold => settings != null ? settings.SnowTemperatureThreshold : 0.35f;
+        private float ColdTemperatureThreshold => settings != null ? settings.ColdTemperatureThreshold : 0.28f;
+        private float ColdDryMoistureThreshold => settings != null ? settings.ColdDryMoistureThreshold : 0.35f;
+        private float HotTemperatureThreshold => settings != null ? settings.HotTemperatureThreshold : 0.68f;
+        private float HotDryMoistureThreshold => settings != null ? settings.HotDryMoistureThreshold : 0.32f;
+        private float HotWetMoistureThreshold => settings != null ? settings.HotWetMoistureThreshold : 0.62f;
+        private float TemperateDryMoistureThreshold => settings != null ? settings.TemperateDryMoistureThreshold : 0.34f;
 
         private void OnEnable()
         {
@@ -136,40 +166,40 @@ namespace MapGenerator.ProceduralWorld
 
         private void AllocateMaps()
         {
-            continents = new float[mapSize, mapSize];
-            mountains = new float[mapSize, mapSize];
-            hills = new float[mapSize, mapSize];
-            temperature = new float[mapSize, mapSize];
-            moisture = new float[mapSize, mapSize];
-            height = new float[mapSize, mapSize];
-            rivers = new bool[mapSize, mapSize];
-            biomes = new WorldBiome[mapSize, mapSize];
+            continents = new float[MapSize, MapSize];
+            mountains = new float[MapSize, MapSize];
+            hills = new float[MapSize, MapSize];
+            temperature = new float[MapSize, MapSize];
+            moisture = new float[MapSize, MapSize];
+            height = new float[MapSize, MapSize];
+            rivers = new bool[MapSize, MapSize];
+            biomes = new WorldBiome[MapSize, MapSize];
         }
 
         private void GenerateContinents()
         {
-            for (int y = 0; y < mapSize; y++)
+            for (int y = 0; y < MapSize; y++)
             {
-                for (int x = 0; x < mapSize; x++)
+                for (int x = 0; x < MapSize; x++)
                 {
                     Vector2 uv = NormalizedCoordinate(x, y);
-                    float voronoi = VoronoiNoise(uv * voronoiScale, seed);
-                    float simplex = SimplexNoise.Fractal(uv.x * continentSimplexScale, uv.y * continentSimplexScale, 4, 0.5f, 2f, seed + 17);
+                    float voronoi = VoronoiNoise(uv * VoronoiScale, Seed);
+                    float simplex = SimplexNoise.Fractal(uv.x * ContinentSimplexScale, uv.y * ContinentSimplexScale, 4, 0.5f, 2f, Seed + 17);
                     float combined = Mathf.Clamp01(voronoi + 0.35f * simplex);
-                    continents[x, y] = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(coastThreshold - coastBlend, coastThreshold + coastBlend, combined));
+                    continents[x, y] = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(CoastThreshold - CoastBlend, CoastThreshold + CoastBlend, combined));
                 }
             }
         }
 
         private void GenerateRelief()
         {
-            for (int y = 0; y < mapSize; y++)
+            for (int y = 0; y < MapSize; y++)
             {
-                for (int x = 0; x < mapSize; x++)
+                for (int x = 0; x < MapSize; x++)
                 {
                     Vector2 uv = NormalizedCoordinate(x, y);
-                    float ridge = SimplexNoise.RidgedFractal(uv.x * mountainScale, uv.y * mountainScale, mountainOctaves, seed + 101);
-                    float hill = Mathf.Clamp01(0.5f + 0.5f * SimplexNoise.Fractal(uv.x * hillScale, uv.y * hillScale, hillOctaves, 0.5f, 2f, seed + 211));
+                    float ridge = SimplexNoise.RidgedFractal(uv.x * MountainScale, uv.y * MountainScale, MountainOctaves, Seed + 101);
+                    float hill = Mathf.Clamp01(0.5f + 0.5f * SimplexNoise.Fractal(uv.x * HillScale, uv.y * HillScale, HillOctaves, 0.5f, 2f, Seed + 211));
                     mountains[x, y] = ridge * continents[x, y];
                     hills[x, y] = hill * continents[x, y];
                     height[x, y] = Mathf.Clamp01(continents[x, y] * 0.7f + mountains[x, y] * 0.2f + hills[x, y] * 0.1f);
@@ -179,13 +209,13 @@ namespace MapGenerator.ProceduralWorld
 
         private void GenerateTemperature()
         {
-            for (int y = 0; y < mapSize; y++)
+            for (int y = 0; y < MapSize; y++)
             {
-                float latitude = 1f - Mathf.Abs((y / (float)(mapSize - 1)) * 2f - 1f);
-                for (int x = 0; x < mapSize; x++)
+                float latitude = 1f - Mathf.Abs((y / (float)(MapSize - 1)) * 2f - 1f);
+                for (int x = 0; x < MapSize; x++)
                 {
                     Vector2 uv = NormalizedCoordinate(x, y);
-                    float noise = SimplexNoise.Noise(uv.x * temperatureNoiseScale, uv.y * temperatureNoiseScale, seed + 307) * temperatureNoiseStrength;
+                    float noise = SimplexNoise.Noise(uv.x * TemperatureNoiseScale, uv.y * TemperatureNoiseScale, Seed + 307) * TemperatureNoiseStrength;
                     float altitudeCooling = mountains[x, y] * 0.28f;
                     temperature[x, y] = Mathf.Clamp01(latitude + noise - altitudeCooling);
                 }
@@ -194,15 +224,15 @@ namespace MapGenerator.ProceduralWorld
 
         private void GenerateMoisture()
         {
-            for (int y = 0; y < mapSize; y++)
+            for (int y = 0; y < MapSize; y++)
             {
-                for (int x = 0; x < mapSize; x++)
+                for (int x = 0; x < MapSize; x++)
                 {
                     Vector2 uv = NormalizedCoordinate(x, y);
-                    float baseMoisture = Mathf.Clamp01(0.5f + 0.5f * SimplexNoise.Fractal(uv.x * moistureScale, uv.y * moistureScale, 4, 0.55f, 2f, seed + 409));
+                    float baseMoisture = Mathf.Clamp01(0.5f + 0.5f * SimplexNoise.Fractal(uv.x * MoistureScale, uv.y * MoistureScale, 4, 0.55f, 2f, Seed + 409));
                     float waterInfluence = 1f - continents[x, y];
                     float coastInfluence = EstimateCoastalMoisture(x, y);
-                    moisture[x, y] = Mathf.Clamp01(baseMoisture + waterInfluence + coastInfluence * coastalMoistureStrength);
+                    moisture[x, y] = Mathf.Clamp01(baseMoisture + waterInfluence + coastInfluence * CoastalMoistureStrength);
                 }
             }
         }
@@ -215,8 +245,8 @@ namespace MapGenerator.ProceduralWorld
             {
                 for (int ox = -radius; ox <= radius; ox++)
                 {
-                    int sx = Mathf.Clamp(x + ox, 0, mapSize - 1);
-                    int sy = Mathf.Clamp(y + oy, 0, mapSize - 1);
+                    int sx = Mathf.Clamp(x + ox, 0, MapSize - 1);
+                    int sy = Mathf.Clamp(y + oy, 0, MapSize - 1);
                     if (continents[sx, sy] < 0.2f)
                     {
                         float distance = Mathf.Max(1f, Mathf.Sqrt(ox * ox + oy * oy));
@@ -230,8 +260,8 @@ namespace MapGenerator.ProceduralWorld
 
         private void GenerateRivers()
         {
-            System.Random random = new System.Random(seed + 503);
-            for (int i = 0; i < riverCount; i++)
+            System.Random random = new System.Random(Seed + 503);
+            for (int i = 0; i < RiverCount; i++)
             {
                 Vector2Int source = FindRiverSource(random);
                 TraceRiver(source);
@@ -240,14 +270,14 @@ namespace MapGenerator.ProceduralWorld
 
         private Vector2Int FindRiverSource(System.Random random)
         {
-            Vector2Int best = new Vector2Int(random.Next(mapSize), random.Next(mapSize));
+            Vector2Int best = new Vector2Int(random.Next(MapSize), random.Next(MapSize));
             float bestScore = -1f;
             for (int attempt = 0; attempt < 128; attempt++)
             {
-                int x = random.Next(mapSize);
-                int y = random.Next(mapSize);
+                int x = random.Next(MapSize);
+                int y = random.Next(MapSize);
                 float score = height[x, y] + mountains[x, y] * 0.5f;
-                if (height[x, y] >= riverSourceMinHeight && score > bestScore)
+                if (height[x, y] >= RiverSourceMinHeight && score > bestScore)
                 {
                     best = new Vector2Int(x, y);
                     bestScore = score;
@@ -261,9 +291,9 @@ namespace MapGenerator.ProceduralWorld
         {
             Vector2Int current = source;
             HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
-            for (int step = 0; step < maxRiverLength; step++)
+            for (int step = 0; step < MaxRiverLength; step++)
             {
-                if (!IsInside(current) || continents[current.x, current.y] < 0.25f || !visited.Add(current))
+                if (!IsInside(current) || continents[current.x, current.y] < OceanContinentThreshold || !visited.Add(current))
                 {
                     break;
                 }
@@ -280,7 +310,7 @@ namespace MapGenerator.ProceduralWorld
                         if (ox == 0 && oy == 0) continue;
                         Vector2Int candidate = new Vector2Int(current.x + ox, current.y + oy);
                         if (!IsInside(candidate)) continue;
-                        float candidateHeight = height[candidate.x, candidate.y] - (continents[candidate.x, candidate.y] < 0.25f ? 0.2f : 0f);
+                        float candidateHeight = height[candidate.x, candidate.y] - (continents[candidate.x, candidate.y] < OceanContinentThreshold ? 0.2f : 0f);
                         if (candidateHeight < nextHeight)
                         {
                             nextHeight = candidateHeight;
@@ -298,37 +328,37 @@ namespace MapGenerator.ProceduralWorld
             }
         }
 
-        private bool IsInside(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < mapSize && p.y < mapSize;
+        private bool IsInside(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < MapSize && p.y < MapSize;
 
         private void GenerateBiomes()
         {
-            for (int y = 0; y < mapSize; y++)
+            for (int y = 0; y < MapSize; y++)
             {
-                for (int x = 0; x < mapSize; x++)
+                for (int x = 0; x < MapSize; x++)
                 {
-                    if (continents[x, y] < 0.25f)
+                    if (continents[x, y] < OceanContinentThreshold)
                     {
                         biomes[x, y] = WorldBiome.Ocean;
                     }
-                    else if (height[x, y] < 0.42f)
+                    else if (height[x, y] < BeachHeightThreshold)
                     {
                         biomes[x, y] = WorldBiome.Beach;
                     }
-                    else if (mountains[x, y] > 0.74f)
+                    else if (mountains[x, y] > MountainThreshold)
                     {
-                        biomes[x, y] = temperature[x, y] < 0.35f ? WorldBiome.Snow : WorldBiome.Mountain;
+                        biomes[x, y] = temperature[x, y] < SnowTemperatureThreshold ? WorldBiome.Snow : WorldBiome.Mountain;
                     }
-                    else if (temperature[x, y] < 0.28f)
+                    else if (temperature[x, y] < ColdTemperatureThreshold)
                     {
-                        biomes[x, y] = moisture[x, y] < 0.35f ? WorldBiome.Tundra : WorldBiome.Taiga;
+                        biomes[x, y] = moisture[x, y] < ColdDryMoistureThreshold ? WorldBiome.Tundra : WorldBiome.Taiga;
                     }
-                    else if (temperature[x, y] > 0.68f)
+                    else if (temperature[x, y] > HotTemperatureThreshold)
                     {
-                        biomes[x, y] = moisture[x, y] < 0.32f ? WorldBiome.Desert : moisture[x, y] > 0.62f ? WorldBiome.Jungle : WorldBiome.Savanna;
+                        biomes[x, y] = moisture[x, y] < HotDryMoistureThreshold ? WorldBiome.Desert : moisture[x, y] > HotWetMoistureThreshold ? WorldBiome.Jungle : WorldBiome.Savanna;
                     }
                     else
                     {
-                        biomes[x, y] = moisture[x, y] < 0.34f ? WorldBiome.Plains : WorldBiome.Forest;
+                        biomes[x, y] = moisture[x, y] < TemperateDryMoistureThreshold ? WorldBiome.Plains : WorldBiome.Forest;
                     }
                 }
             }
@@ -336,9 +366,9 @@ namespace MapGenerator.ProceduralWorld
 
         private void RenderPreviewTexture()
         {
-            if (generatedTexture == null || generatedTexture.width != mapSize || generatedTexture.height != mapSize)
+            if (generatedTexture == null || generatedTexture.width != MapSize || generatedTexture.height != MapSize)
             {
-                generatedTexture = new Texture2D(mapSize, mapSize, TextureFormat.RGBA32, false)
+                generatedTexture = new Texture2D(MapSize, MapSize, TextureFormat.RGBA32, false)
                 {
                     name = "Generated World Map",
                     wrapMode = TextureWrapMode.Clamp,
@@ -346,15 +376,19 @@ namespace MapGenerator.ProceduralWorld
                 };
             }
 
-            int pixelCount = mapSize * mapSize;
-            if (_previewPixels == null || _previewPixels.Length != pixelCount)
-            {
-                _previewPixels = new Color32[pixelCount];
-            }
+//<<<<<<< //codex/create-worldsettings-asset-with-parameters
+           // for (int y = 0; y < MapSize; y++)
+//=======
+            //int pixelCount = mapSize * mapSize;
+            //if (_previewPixels == null || _previewPixels.Length != pixelCount)
+            //{
+            //    _previewPixels = new Color32[pixelCount];
+            //}
 
-            for (int y = 0; y < mapSize; y++)
+            //for (int y = 0; y < mapSize; y++)
+//>>>>>>> //main 
             {
-                for (int x = 0; x < mapSize; x++)
+                for (int x = 0; x < MapSize; x++)
                 {
                     _previewPixels[x + y * mapSize] = GetPreviewColor(x, y);
                 }
@@ -386,8 +420,13 @@ namespace MapGenerator.ProceduralWorld
             }
         }
 
-        private static Color BiomeColor(WorldBiome biome)
+        private Color BiomeColor(WorldBiome biome)
         {
+            if (settings != null)
+            {
+                return settings.GetBiomeColor(biome);
+            }
+
             switch (biome)
             {
                 case WorldBiome.Ocean: return new Color(0.02f, 0.13f, 0.42f);
@@ -405,7 +444,7 @@ namespace MapGenerator.ProceduralWorld
             }
         }
 
-        private Vector2 NormalizedCoordinate(int x, int y) => new Vector2(x / (float)(mapSize - 1), y / (float)(mapSize - 1));
+        private Vector2 NormalizedCoordinate(int x, int y) => new Vector2(x / (float)(MapSize - 1), y / (float)(MapSize - 1));
 
         private static float VoronoiNoise(Vector2 point, int noiseSeed)
         {
