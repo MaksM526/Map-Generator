@@ -10,7 +10,10 @@ namespace MapGenerator.ProceduralWorld
         [SerializeField, Min(0.01f)] private float radius = 10f;
         [SerializeField] private bool autoRegenerate = true;
 
+        private const string GeneratedMeshName = "Procedural Cube Sphere";
+
         private bool _needsRegenerate;
+        private Mesh _generatedMesh;
 
         private void OnEnable()
         {
@@ -28,6 +31,7 @@ namespace MapGenerator.ProceduralWorld
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.update -= HandleEditorUpdate;
 #endif
+            CleanupGeneratedMesh();
         }
 
         private void OnValidate()
@@ -54,7 +58,7 @@ namespace MapGenerator.ProceduralWorld
         [ContextMenu("Generate Cube Sphere")]
         public void Generate()
         {
-            Mesh mesh = new Mesh { name = "Procedural Cube Sphere" };
+            Mesh mesh = new Mesh { name = GeneratedMeshName };
             int verticesPerFace = (gridSize + 1) * (gridSize + 1);
             Vector3[] vertices = new Vector3[verticesPerFace * 6];
             Vector3[] normals = new Vector3[vertices.Length];
@@ -104,7 +108,73 @@ namespace MapGenerator.ProceduralWorld
             mesh.uv = uv;
             mesh.triangles = triangles;
             mesh.RecalculateBounds();
-            GetComponent<MeshFilter>().sharedMesh = mesh;
+
+            MeshFilter meshFilter = GetComponent<MeshFilter>();
+            Mesh previousMesh = meshFilter.sharedMesh;
+            bool shouldDestroyPreviousMesh = IsGeneratedMesh(previousMesh);
+            meshFilter.sharedMesh = mesh;
+            _generatedMesh = mesh;
+
+            if (shouldDestroyPreviousMesh)
+            {
+                DestroyGeneratedMesh(previousMesh);
+            }
+        }
+
+        private void CleanupGeneratedMesh()
+        {
+            MeshFilter meshFilter = GetComponent<MeshFilter>();
+            if (meshFilter.sharedMesh == _generatedMesh)
+            {
+                meshFilter.sharedMesh = null;
+            }
+
+            DestroyGeneratedMesh(_generatedMesh);
+        }
+
+        private void DestroyGeneratedMesh(Mesh mesh)
+        {
+            if (!IsGeneratedMesh(mesh))
+            {
+                return;
+            }
+
+            if (mesh == _generatedMesh)
+            {
+                _generatedMesh = null;
+            }
+            if (Application.isPlaying)
+            {
+                Destroy(mesh);
+            }
+            else
+            {
+                DestroyImmediate(mesh);
+            }
+        }
+
+        private bool IsGeneratedMesh(Mesh mesh)
+        {
+            if (mesh == null)
+            {
+                return false;
+            }
+
+            if (mesh == _generatedMesh)
+            {
+                return true;
+            }
+
+            return mesh.name == GeneratedMeshName && !IsPersistentAsset(mesh);
+        }
+
+        private static bool IsPersistentAsset(Mesh mesh)
+        {
+#if UNITY_EDITOR
+            return UnityEditor.EditorUtility.IsPersistent(mesh);
+#else
+            return false;
+#endif
         }
 
         private static Vector2 GetFaceAtlasUv(int face, Vector2 percent)
