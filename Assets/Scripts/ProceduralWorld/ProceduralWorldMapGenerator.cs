@@ -86,8 +86,11 @@ namespace MapGenerator.ProceduralWorld
         private bool[,] lakes;
         private WorldBiome[,] biomes;
         private bool[,] spawnMap;
+        private const string GeneratedTextureName = "Generated World Map";
+
         private Color32[] _previewPixels;
         private bool _needsRegenerate;
+        private Texture2D _generatedTextureInstance;
 
         public Texture2D GeneratedTexture => generatedTexture;
         public float[,] ContinentsMap => CopyMap(continents);
@@ -147,6 +150,7 @@ namespace MapGenerator.ProceduralWorld
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.update -= HandleEditorUpdate;
 #endif
+            CleanupGeneratedTexture();
         }
 
         private void OnValidate()
@@ -534,12 +538,16 @@ namespace MapGenerator.ProceduralWorld
         {
             if (generatedTexture == null || generatedTexture.width != MapSize || generatedTexture.height != MapSize)
             {
+                Texture2D previousTexture = generatedTexture;
                 generatedTexture = new Texture2D(MapSize, MapSize, TextureFormat.RGBA32, false)
                 {
-                    name = "Generated World Map",
+                    name = GeneratedTextureName,
                     wrapMode = TextureWrapMode.Clamp,
                     filterMode = FilterMode.Point
                 };
+                _generatedTextureInstance = generatedTexture;
+
+                DestroyGeneratedTexture(previousTexture);
             }
 
             int pixelCount = MapSize * MapSize;
@@ -564,6 +572,63 @@ namespace MapGenerator.ProceduralWorld
             {
                 material.mainTexture = generatedTexture;
             }
+        }
+
+        private void CleanupGeneratedTexture()
+        {
+            Texture2D texture = generatedTexture;
+            if (texture == _generatedTextureInstance)
+            {
+                generatedTexture = null;
+            }
+
+            DestroyGeneratedTexture(texture);
+        }
+
+        private void DestroyGeneratedTexture(Texture2D texture)
+        {
+            if (!IsGeneratedTexture(texture))
+            {
+                return;
+            }
+
+            if (texture == _generatedTextureInstance)
+            {
+                _generatedTextureInstance = null;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(texture);
+            }
+            else
+            {
+                DestroyImmediate(texture);
+            }
+        }
+
+        private bool IsGeneratedTexture(Texture2D texture)
+        {
+            if (texture == null)
+            {
+                return false;
+            }
+
+            if (texture == _generatedTextureInstance)
+            {
+                return true;
+            }
+
+            return texture.name == GeneratedTextureName && !IsPersistentAsset(texture);
+        }
+
+        private static bool IsPersistentAsset(Texture2D texture)
+        {
+#if UNITY_EDITOR
+            return UnityEditor.EditorUtility.IsPersistent(texture);
+#else
+            return false;
+#endif
         }
 
         private Color GetPreviewColor(int x, int y)
