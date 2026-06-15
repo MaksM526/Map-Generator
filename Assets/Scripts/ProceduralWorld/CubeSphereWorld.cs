@@ -10,21 +10,46 @@ namespace MapGenerator.ProceduralWorld
         [SerializeField, Min(0.01f)] private float radius = 10f;
         [SerializeField] private bool autoRegenerate = true;
 
+        private bool _needsRegenerate;
+
         private void OnEnable()
         {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.update += HandleEditorUpdate;
+#endif
             if (autoRegenerate)
             {
                 Generate();
             }
         }
 
+        private void OnDisable()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.update -= HandleEditorUpdate;
+#endif
+        }
+
         private void OnValidate()
         {
             if (autoRegenerate)
             {
-                Generate();
+                _needsRegenerate = true;
             }
         }
+
+#if UNITY_EDITOR
+        private void HandleEditorUpdate()
+        {
+            if (!_needsRegenerate)
+            {
+                return;
+            }
+
+            _needsRegenerate = false;
+            Generate();
+        }
+#endif
 
         [ContextMenu("Generate Cube Sphere")]
         public void Generate()
