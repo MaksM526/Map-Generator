@@ -67,6 +67,9 @@ namespace MapGenerator.ProceduralWorld
         [Header("Rivers")]
         [SerializeField, Range(0, 256)] private int riverCount = 48;
         [SerializeField, Range(16, 2048)] private int maxRiverLength = 512;
+        [SerializeField, Min(0)] private int minRiverLength = 24;
+        [SerializeField, Min(0)] private int minRiverTurns = 2;
+        [SerializeField, Min(0)] private int maxRiverIntersections = 1;
         [SerializeField, Range(0.45f, 1f)] private float riverSourceMinHeight = 0.62f;
 
         [Header("Output")]
@@ -113,6 +116,9 @@ namespace MapGenerator.ProceduralWorld
         private float CoastalMoistureStrength => settings != null ? settings.CoastalMoistureStrength : coastalMoistureStrength;
         private int RiverCount => settings != null ? settings.RiverCount : riverCount;
         private int MaxRiverLength => settings != null ? settings.MaxRiverLength : maxRiverLength;
+        private int MinRiverLength => settings != null ? settings.MinRiverLength : minRiverLength;
+        private int MinRiverTurns => settings != null ? settings.MinRiverTurns : minRiverTurns;
+        private int MaxRiverIntersections => settings != null ? settings.MaxRiverIntersections : maxRiverIntersections;
         private float RiverSourceMinHeight => settings != null ? settings.RiverSourceMinHeight : riverSourceMinHeight;
         private float OceanContinentThreshold => settings != null ? settings.OceanContinentThreshold : 0.25f;
         private float BeachHeightThreshold => settings != null ? settings.BeachHeightThreshold : 0.42f;
@@ -146,6 +152,10 @@ namespace MapGenerator.ProceduralWorld
         private void OnValidate()
         {
             mapSize = Mathf.Max(16, mapSize);
+            maxRiverLength = Mathf.Max(1, maxRiverLength);
+            minRiverLength = Mathf.Max(0, minRiverLength);
+            minRiverTurns = Mathf.Max(0, minRiverTurns);
+            maxRiverIntersections = Mathf.Max(0, maxRiverIntersections);
             if (autoRegenerate)
             {
                 _needsRegenerate = true;
@@ -308,16 +318,38 @@ namespace MapGenerator.ProceduralWorld
         private void TraceRiver(Vector2Int source)
         {
             Vector2Int current = source;
+            List<Vector2Int> path = new List<Vector2Int>();
             HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+            bool reachedOcean = false;
+            bool reachedRiver = false;
+            int intersections = 0;
+
             for (int step = 0; step < MaxRiverLength; step++)
             {
-                if (!IsInside(current) || continents[current.x, current.y] < OceanContinentThreshold || !visited.Add(current))
+                if (!IsInside(current))
                 {
                     break;
                 }
 
-                rivers[current.x, current.y] = true;
-                moisture[current.x, current.y] = 1f;
+                if (continents[current.x, current.y] < OceanContinentThreshold)
+                {
+                    reachedOcean = true;
+                    break;
+                }
+
+                if (!visited.Add(current))
+                {
+                    break;
+                }
+
+                path.Add(current);
+
+                if (rivers[current.x, current.y])
+                {
+                    intersections++;
+                    reachedRiver = true;
+                    break;
+                }
 
                 Vector2Int next = current;
                 float nextHeight = height[current.x, current.y];
@@ -344,6 +376,35 @@ namespace MapGenerator.ProceduralWorld
 
                 current = next;
             }
+
+            if (path.Count < MinRiverLength || CountRiverTurns(path) < MinRiverTurns || intersections > MaxRiverIntersections || (!reachedOcean && !reachedRiver))
+            {
+                return;
+            }
+
+            foreach (Vector2Int riverTile in path)
+            {
+                rivers[riverTile.x, riverTile.y] = true;
+                moisture[riverTile.x, riverTile.y] = 1f;
+            }
+        }
+
+        private static int CountRiverTurns(List<Vector2Int> path)
+        {
+            int turns = 0;
+            Vector2Int previousDirection = Vector2Int.zero;
+            for (int i = 1; i < path.Count; i++)
+            {
+                Vector2Int direction = path[i] - path[i - 1];
+                if (previousDirection != Vector2Int.zero && direction != previousDirection)
+                {
+                    turns++;
+                }
+
+                previousDirection = direction;
+            }
+
+            return turns;
         }
 
         private bool IsInside(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < MapSize && p.y < MapSize;
