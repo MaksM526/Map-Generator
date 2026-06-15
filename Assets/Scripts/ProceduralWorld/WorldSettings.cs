@@ -30,6 +30,9 @@ namespace MapGenerator.ProceduralWorld
         [Header("Rivers")]
         [SerializeField, Range(0, 256)] private int riverCount = 48;
         [SerializeField, Range(16, 2048)] private int maxRiverLength = 512;
+        [SerializeField, Min(0)] private int minRiverLength = 24;
+        [SerializeField, Min(0)] private int minRiverTurns = 2;
+        [SerializeField, Min(0)] private int maxRiverIntersections = 1;
         [SerializeField, Range(0.45f, 1f)] private float riverSourceMinHeight = 0.62f;
 
         [Header("Biome Thresholds")]
@@ -73,6 +76,9 @@ namespace MapGenerator.ProceduralWorld
         public float CoastalMoistureStrength => coastalMoistureStrength;
         public int RiverCount => riverCount;
         public int MaxRiverLength => maxRiverLength;
+        public int MinRiverLength => minRiverLength;
+        public int MinRiverTurns => minRiverTurns;
+        public int MaxRiverIntersections => maxRiverIntersections;
         public float RiverSourceMinHeight => riverSourceMinHeight;
         public float OceanContinentThreshold => oceanContinentThreshold;
         public float BeachHeightThreshold => beachHeightThreshold;
