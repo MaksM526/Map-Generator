@@ -325,67 +325,14 @@ namespace MapGenerator.ProceduralWorld
 
         private void TraceRiver(Vector2Int source)
         {
-            Vector2Int current = source;
-            List<Vector2Int> path = new List<Vector2Int>();
-            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
-            bool reachedOcean = false;
-            bool reachedRiver = false;
-            int intersections = 0;
+            RiverTraceSettings traceSettings = new RiverTraceSettings(
+                MaxRiverLength,
+                MinRiverLength,
+                MinRiverTurns,
+                MaxRiverIntersections,
+                OceanContinentThreshold);
 
-            for (int step = 0; step < MaxRiverLength; step++)
-            {
-                if (!IsInside(current))
-                {
-                    break;
-                }
-
-                if (continents[current.x, current.y] < OceanContinentThreshold)
-                {
-                    reachedOcean = true;
-                    break;
-                }
-
-                if (!visited.Add(current))
-                {
-                    break;
-                }
-
-                path.Add(current);
-
-                if (rivers[current.x, current.y])
-                {
-                    intersections++;
-                    reachedRiver = true;
-                    break;
-                }
-
-                Vector2Int next = current;
-                float nextHeight = height[current.x, current.y];
-                for (int oy = -1; oy <= 1; oy++)
-                {
-                    for (int ox = -1; ox <= 1; ox++)
-                    {
-                        if (ox == 0 && oy == 0) continue;
-                        Vector2Int candidate = new Vector2Int(current.x + ox, current.y + oy);
-                        if (!IsInside(candidate)) continue;
-                        float candidateHeight = height[candidate.x, candidate.y] - (continents[candidate.x, candidate.y] < OceanContinentThreshold ? 0.2f : 0f);
-                        if (candidateHeight < nextHeight)
-                        {
-                            nextHeight = candidateHeight;
-                            next = candidate;
-                        }
-                    }
-                }
-
-                if (next == current)
-                {
-                    break;
-                }
-
-                current = next;
-            }
-
-            if (path.Count < MinRiverLength || CountRiverTurns(path) < MinRiverTurns || intersections > MaxRiverIntersections || (!reachedOcean && !reachedRiver))
+            if (!RiverGenerator.TryTraceRiver(source, continents, height, rivers, traceSettings, out List<Vector2Int> path))
             {
                 return;
             }
@@ -395,24 +342,6 @@ namespace MapGenerator.ProceduralWorld
                 rivers[riverTile.x, riverTile.y] = true;
                 moisture[riverTile.x, riverTile.y] = 1f;
             }
-        }
-
-        private static int CountRiverTurns(List<Vector2Int> path)
-        {
-            int turns = 0;
-            Vector2Int previousDirection = Vector2Int.zero;
-            for (int i = 1; i < path.Count; i++)
-            {
-                Vector2Int direction = path[i] - path[i - 1];
-                if (previousDirection != Vector2Int.zero && direction != previousDirection)
-                {
-                    turns++;
-                }
-
-                previousDirection = direction;
-            }
-
-            return turns;
         }
 
         private bool IsInside(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < MapSize && p.y < MapSize;
@@ -466,38 +395,36 @@ namespace MapGenerator.ProceduralWorld
 
         private void GenerateBiomes()
         {
+            BiomeClassificationSettings biomeSettings = CreateBiomeClassificationSettings();
             for (int y = 0; y < MapSize; y++)
             {
                 for (int x = 0; x < MapSize; x++)
                 {
-                    if (continents[x, y] < OceanContinentThreshold)
-                    {
-                        biomes[x, y] = WorldBiome.Ocean;
-                    }
-                    else if (height[x, y] < BeachHeightThreshold)
-                    {
-                        biomes[x, y] = WorldBiome.Beach;
-                    }
-                    else if (mountains[x, y] > MountainThreshold)
-                    {
-                        biomes[x, y] = temperature[x, y] < SnowTemperatureThreshold ? WorldBiome.Snow : WorldBiome.Mountain;
-                    }
-                    else if (temperature[x, y] < ColdTemperatureThreshold)
-                    {
-                        biomes[x, y] = moisture[x, y] < ColdDryMoistureThreshold ? WorldBiome.Tundra : WorldBiome.Taiga;
-                    }
-                    else if (temperature[x, y] > HotTemperatureThreshold)
-                    {
-                        biomes[x, y] = moisture[x, y] < HotDryMoistureThreshold ? WorldBiome.Desert : moisture[x, y] > HotWetMoistureThreshold ? WorldBiome.Jungle : WorldBiome.Savanna;
-                    }
-                    else
-                    {
-                        biomes[x, y] = moisture[x, y] < TemperateDryMoistureThreshold ? WorldBiome.Plains : WorldBiome.Forest;
-                    }
+                    biomes[x, y] = BiomeGenerator.ClassifyBiome(
+                        continents[x, y],
+                        height[x, y],
+                        mountains[x, y],
+                        temperature[x, y],
+                        moisture[x, y],
+                        biomeSettings);
                 }
             }
         }
 
+        private BiomeClassificationSettings CreateBiomeClassificationSettings()
+        {
+            return new BiomeClassificationSettings(
+                OceanContinentThreshold,
+                BeachHeightThreshold,
+                MountainThreshold,
+                SnowTemperatureThreshold,
+                ColdTemperatureThreshold,
+                ColdDryMoistureThreshold,
+                HotTemperatureThreshold,
+                HotDryMoistureThreshold,
+                HotWetMoistureThreshold,
+                TemperateDryMoistureThreshold);
+        }
 
         private void GenerateSpawnMap()
         {
