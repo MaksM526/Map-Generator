@@ -13,7 +13,9 @@ namespace MapGenerator.ProceduralWorld
         Hills,
         Temperature,
         Moisture,
-        Rivers
+        Rivers,
+        Lakes,
+        SpawnMap
     }
 
     public enum WorldBiome
@@ -78,11 +80,23 @@ namespace MapGenerator.ProceduralWorld
         private float[,] moisture;
         private float[,] height;
         private bool[,] rivers;
+        private bool[,] lakes;
         private WorldBiome[,] biomes;
+        private bool[,] spawnMap;
         private Color32[] _previewPixels;
         private bool _needsRegenerate;
 
         public Texture2D GeneratedTexture => generatedTexture;
+        public float[,] ContinentsMap => CopyMap(continents);
+        public float[,] MountainsMap => CopyMap(mountains);
+        public float[,] HillsMap => CopyMap(hills);
+        public float[,] TemperatureMap => CopyMap(temperature);
+        public float[,] MoistureMap => CopyMap(moisture);
+        public float[,] HeightMap => CopyMap(height);
+        public bool[,] RiversMap => CopyMap(rivers);
+        public bool[,] LakesMap => CopyMap(lakes);
+        public WorldBiome[,] BiomesMap => CopyMap(biomes);
+        public bool[,] SpawnMap => CopyMap(spawnMap);
         private int MapSize => settings != null ? settings.MapSize : Mathf.Max(16, mapSize);
         private int Seed => settings != null ? settings.Seed : seed;
         private float VoronoiScale => settings != null ? settings.VoronoiScale : voronoiScale;
@@ -160,7 +174,9 @@ namespace MapGenerator.ProceduralWorld
             GenerateTemperature();
             GenerateMoisture();
             GenerateRivers();
+            GenerateLakes();
             GenerateBiomes();
+            GenerateSpawnMap();
             RenderPreviewTexture();
         }
 
@@ -173,7 +189,9 @@ namespace MapGenerator.ProceduralWorld
             moisture = new float[MapSize, MapSize];
             height = new float[MapSize, MapSize];
             rivers = new bool[MapSize, MapSize];
+            lakes = new bool[MapSize, MapSize];
             biomes = new WorldBiome[MapSize, MapSize];
+            spawnMap = new bool[MapSize, MapSize];
         }
 
         private void GenerateContinents()
@@ -330,6 +348,53 @@ namespace MapGenerator.ProceduralWorld
 
         private bool IsInside(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x < MapSize && p.y < MapSize;
 
+        private void GenerateLakes()
+        {
+            for (int y = 0; y < MapSize; y++)
+            {
+                for (int x = 0; x < MapSize; x++)
+                {
+                    if (continents[x, y] < OceanContinentThreshold || rivers[x, y])
+                    {
+                        continue;
+                    }
+
+                    bool localBasin = IsLocalBasin(x, y);
+                    bool wetLowland = moisture[x, y] > 0.82f && height[x, y] < 0.58f && mountains[x, y] < MountainThreshold;
+                    if (localBasin || wetLowland)
+                    {
+                        lakes[x, y] = true;
+                        moisture[x, y] = 1f;
+                    }
+                }
+            }
+        }
+
+        private bool IsLocalBasin(int x, int y)
+        {
+            if (height[x, y] >= 0.62f || moisture[x, y] < 0.58f)
+            {
+                return false;
+            }
+
+            float currentHeight = height[x, y];
+            for (int oy = -1; oy <= 1; oy++)
+            {
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    if (ox == 0 && oy == 0) continue;
+                    int sx = Mathf.Clamp(x + ox, 0, MapSize - 1);
+                    int sy = Mathf.Clamp(y + oy, 0, MapSize - 1);
+                    if (height[sx, sy] < currentHeight || continents[sx, sy] < OceanContinentThreshold)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
         private void GenerateBiomes()
         {
             for (int y = 0; y < MapSize; y++)
@@ -364,6 +429,42 @@ namespace MapGenerator.ProceduralWorld
             }
         }
 
+
+        private void GenerateSpawnMap()
+        {
+            for (int y = 0; y < MapSize; y++)
+            {
+                for (int x = 0; x < MapSize; x++)
+                {
+                    spawnMap[x, y] = IsSpawnCandidate(x, y);
+                }
+            }
+        }
+
+        private bool IsSpawnCandidate(int x, int y)
+        {
+            if (continents[x, y] < OceanContinentThreshold || rivers[x, y] || lakes[x, y])
+            {
+                return false;
+            }
+
+            if (height[x, y] < BeachHeightThreshold || mountains[x, y] > MountainThreshold)
+            {
+                return false;
+            }
+
+            switch (biomes[x, y])
+            {
+                case WorldBiome.Plains:
+                case WorldBiome.Forest:
+                case WorldBiome.Savanna:
+                case WorldBiome.Taiga:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private void RenderPreviewTexture()
         {
             if (generatedTexture == null || generatedTexture.width != MapSize || generatedTexture.height != MapSize)
@@ -376,21 +477,17 @@ namespace MapGenerator.ProceduralWorld
                 };
             }
 
-//<<<<<<< //codex/create-worldsettings-asset-with-parameters
-           // for (int y = 0; y < MapSize; y++)
-//=======
-            //int pixelCount = mapSize * mapSize;
-            //if (_previewPixels == null || _previewPixels.Length != pixelCount)
-            //{
-            //    _previewPixels = new Color32[pixelCount];
-            //}
+            int pixelCount = MapSize * MapSize;
+            if (_previewPixels == null || _previewPixels.Length != pixelCount)
+            {
+                _previewPixels = new Color32[pixelCount];
+            }
 
-            //for (int y = 0; y < mapSize; y++)
-//>>>>>>> //main 
+            for (int y = 0; y < MapSize; y++)
             {
                 for (int x = 0; x < MapSize; x++)
                 {
-                    _previewPixels[x + y * mapSize] = GetPreviewColor(x, y);
+                    _previewPixels[x + y * MapSize] = GetPreviewColor(x, y);
                 }
             }
 
@@ -407,6 +504,8 @@ namespace MapGenerator.ProceduralWorld
         private Color GetPreviewColor(int x, int y)
         {
             if (rivers[x, y] && (preview == WorldMapPreview.Biomes || preview == WorldMapPreview.Rivers)) return new Color(0.08f, 0.32f, 0.9f);
+            if (lakes[x, y] && (preview == WorldMapPreview.Biomes || preview == WorldMapPreview.Lakes)) return new Color(0.05f, 0.45f, 0.8f);
+            if (spawnMap[x, y] && preview == WorldMapPreview.SpawnMap) return new Color(0.1f, 0.9f, 0.2f);
             switch (preview)
             {
                 case WorldMapPreview.Height: return Color.Lerp(Color.black, Color.white, height[x, y]);
@@ -416,6 +515,8 @@ namespace MapGenerator.ProceduralWorld
                 case WorldMapPreview.Temperature: return Color.Lerp(Color.blue, Color.red, temperature[x, y]);
                 case WorldMapPreview.Moisture: return Color.Lerp(new Color(0.45f, 0.28f, 0.12f), Color.cyan, moisture[x, y]);
                 case WorldMapPreview.Rivers: return rivers[x, y] ? Color.blue : Color.black;
+                case WorldMapPreview.Lakes: return lakes[x, y] ? Color.cyan : Color.black;
+                case WorldMapPreview.SpawnMap: return spawnMap[x, y] ? Color.green : Color.black;
                 default: return BiomeColor(biomes[x, y]);
             }
         }
@@ -442,6 +543,12 @@ namespace MapGenerator.ProceduralWorld
                 case WorldBiome.Snow: return Color.white;
                 default: return Color.magenta;
             }
+        }
+
+
+        private static T[,] CopyMap<T>(T[,] source)
+        {
+            return source == null ? null : (T[,])source.Clone();
         }
 
         private Vector2 NormalizedCoordinate(int x, int y) => new Vector2(x / (float)(MapSize - 1), y / (float)(MapSize - 1));
