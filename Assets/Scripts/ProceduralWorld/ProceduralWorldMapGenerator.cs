@@ -291,14 +291,18 @@ namespace MapGenerator.ProceduralWorld
             System.Random random = new System.Random(Seed + 503);
             for (int i = 0; i < RiverCount; i++)
             {
-                Vector2Int source = FindRiverSource(random);
+                if (!TryFindRiverSource(random, out Vector2Int source))
+                {
+                    continue;
+                }
+
                 TraceRiver(source);
             }
         }
 
-        private Vector2Int FindRiverSource(System.Random random)
+        private bool TryFindRiverSource(System.Random random, out Vector2Int source)
         {
-            Vector2Int best = new Vector2Int(random.Next(MapSize), random.Next(MapSize));
+            source = Vector2Int.zero;
             float bestScore = -1f;
             for (int attempt = 0; attempt < 128; attempt++)
             {
@@ -307,12 +311,12 @@ namespace MapGenerator.ProceduralWorld
                 float score = height[x, y] + mountains[x, y] * 0.5f;
                 if (height[x, y] >= RiverSourceMinHeight && score > bestScore)
                 {
-                    best = new Vector2Int(x, y);
+                    source = new Vector2Int(x, y);
                     bestScore = score;
                 }
             }
 
-            return best;
+            return bestScore >= 0f;
         }
 
         private void TraceRiver(Vector2Int source)
