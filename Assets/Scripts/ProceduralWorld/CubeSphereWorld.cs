@@ -78,7 +78,7 @@ namespace MapGenerator.ProceduralWorld
                         Vector3 pointOnSphere = pointOnCube.normalized;
                         vertices[vertexIndex] = pointOnSphere * radius;
                         normals[vertexIndex] = pointOnSphere;
-                        uv[vertexIndex] = percent;
+                        uv[vertexIndex] = GetFaceAtlasUv(face, percent);
                         vertexIndex++;
                     }
                 }
@@ -105,6 +105,20 @@ namespace MapGenerator.ProceduralWorld
             mesh.triangles = triangles;
             mesh.RecalculateBounds();
             GetComponent<MeshFilter>().sharedMesh = mesh;
+        }
+
+        private static Vector2 GetFaceAtlasUv(int face, Vector2 percent)
+        {
+            const int atlasColumns = 3;
+            const int atlasRows = 2;
+
+            int atlasX = face % atlasColumns;
+            int atlasY = face / atlasColumns;
+            Vector2 tileSize = new Vector2(1f / atlasColumns, 1f / atlasRows);
+
+            return new Vector2(
+                (atlasX + percent.x) * tileSize.x,
+                (atlasY + percent.y) * tileSize.y);
         }
 
         private static Vector3 FaceNormal(int face)
