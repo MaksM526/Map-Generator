@@ -76,6 +76,7 @@ namespace MapGenerator.ProceduralWorld
         private float[,] height;
         private bool[,] rivers;
         private WorldBiome[,] biomes;
+        private Color32[] _previewPixels;
         private bool _needsRegenerate;
 
         public Texture2D GeneratedTexture => generatedTexture;
@@ -345,15 +346,22 @@ namespace MapGenerator.ProceduralWorld
                 };
             }
 
+            int pixelCount = mapSize * mapSize;
+            if (_previewPixels == null || _previewPixels.Length != pixelCount)
+            {
+                _previewPixels = new Color32[pixelCount];
+            }
+
             for (int y = 0; y < mapSize; y++)
             {
                 for (int x = 0; x < mapSize; x++)
                 {
-                    generatedTexture.SetPixel(x, y, GetPreviewColor(x, y));
+                    _previewPixels[x + y * mapSize] = GetPreviewColor(x, y);
                 }
             }
 
-            generatedTexture.Apply();
+            generatedTexture.SetPixels32(_previewPixels);
+            generatedTexture.Apply(false);
             Renderer renderer = GetComponent<Renderer>();
             Material material = targetMaterial != null ? targetMaterial : renderer.sharedMaterial;
             if (material != null)
